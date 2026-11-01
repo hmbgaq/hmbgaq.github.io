@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>지식 지도</title>
+<meta name="description" content="심리·인지·재미에 관한 개념 1,400여 개와 그 사이의 관계(설명한다·늘린다·줄인다·조건이다)를 연구 근거와 함께 탐색하는 지도입니다.">
+<link rel="canonical" href="https://hmbgaq.github.io/map/">
+<style>
+:root{--bg:#fff;--fg:#222;--mute:#666;--line:#e3e6ec;--acc:#1a5fb4;--pos:#1b7f4b;--neg:#b5452e}
+@media (prefers-color-scheme:dark){:root{--bg:#16181c;--fg:#e6e6e6;--mute:#aaa;--line:#3a3f48;--acc:#8ab4f8;--pos:#6fcf97;--neg:#f28b74}}
+body{font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;margin:0;background:var(--bg);color:var(--fg)}
+header{max-width:1100px;margin:0 auto;padding:16px}
+header a{color:var(--acc)}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px 24px;display:grid;grid-template-columns:1fr 340px;gap:16px}
+@media (max-width:800px){.wrap{grid-template-columns:1fr}}
+#q{width:100%;box-sizing:border-box;padding:10px 12px;font-size:1em;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+#hits{list-style:none;padding:0;margin:6px 0;max-height:180px;overflow:auto}
+#hits li{padding:4px 6px;cursor:pointer;border-radius:4px}#hits li:hover{background:var(--line)}
+svg{width:100%;height:560px;border:1px solid var(--line);border-radius:8px;touch-action:none}
+.panel{border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:.93em;line-height:1.65;max-height:640px;overflow:auto}
+.panel h2{font-size:1.1em;margin:.2em 0 .4em}.mute{color:var(--mute)}
+.rel{margin:.45em 0;padding-left:8px;border-left:3px solid var(--line)}
+.rel.pos{border-color:var(--pos)}.rel.neg{border-color:var(--neg)}
+.rel a{cursor:pointer;color:var(--acc)}
+text{font-size:12px;fill:var(--fg);pointer-events:none}
+</style>
+</head>
+<body>
+<header>
+<a href="/">몽상가 명빈 연구 노트</a> · <a href="/about/">소개</a>
+<h1 style="font-size:1.4em;margin:.5em 0 .2em">지식 지도</h1>
+<p class="mute" style="margin:0 0 .5em">심리·인지·재미에 관한 개념과 그 사이의 관계입니다. 개념을 검색하거나 눌러 보세요. 초록 테두리는 늘린다, 붉은 테두리는 줄인다이고, 연구로 확인한 관계에는 논문이 붙어 있습니다.</p>
+<input id="q" placeholder="개념 검색 (예: 내재적 동기, 새 출발 효과, 인지 부하)" autocomplete="off">
+<ul id="hits"></ul>
+</header>
+<div class="wrap">
+<svg id="g" aria-label="선택한 개념과 이웃 개념의 관계 그래프"></svg>
+<div class="panel" id="panel"><p class="mute">불러오는 중…</p></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+(async function () {
+  const data = await fetch("/map.json").then(r => r.json());
+  const byId = new Map(data.nodes.map(n => [n.id, n]));
+  const out = new Map(), inn = new Map();
+  data.rels.forEach(r => {
+    (out.get(r.s) || out.set(r.s, []).get(r.s)).push(r);
+    (inn.get(r.o) || inn.set(r.o, []).get(r.o)).push(r);
+  });
+  const deg = id => (out.get(id) || []).length + (inn.get(id) || []).length;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  const tone = r => r.r === "늘린다" ? "pos" : r.r === "줄인다" ? "neg" : "";
+  const svg = d3.select("#g");
+  let sim = null;
+
+  function relLine(r, self) {
+    const other = r.s === self ? r.o : r.s;
+    const left = r.s === self ? "이 개념" : `<a data-id="${esc(other)}">${esc(byId.get(other).t)}</a>`;
+    const right = r.o === self ? "이 개념" : `<a data-id="${esc(other)}">${esc(byId.get(other).t)}</a>`;
+    let h = `<div class="rel ${tone(r)}">${left} <b>${esc(r.r)}</b> ${right}`;
+    if (r.when && r.when.length) h += `<br><span class="mute">조건: ${esc(r.when.join(" / "))}</span>`;
+    if (r.ev) h += `<br><span class="mute">연구: ${esc(r.ev.st)} · ` + r.ev.p.map(p => `<a href="https://doi.org/${esc(p.doi)}" rel="nofollow" target="_blank">${esc(p.y || "")}</a>`).join(", ") + "</span>";
+    return h + "</div>";
+  }
+
+  function show(id) {
+    const n = byId.get(id);
+    if (!n) return;
+    history.replaceState(null, "", "?c=" + encodeURIComponent(id));
+    const rs = (out.get(id) || []).concat(inn.get(id) || []);
+    rs.sort((a, b) => (b.ev ? 1 : 0) - (a.ev ? 1 : 0));
+    document.getElementById("panel").innerHTML =
+      `<h2>${esc(n.t)}</h2><p>${esc(n.d)}</p><p class="mute">관계 ${rs.length}개</p>` +
+      (rs.length ? rs.map(r => relLine(r, id)).join("") : `<p class="mute">아직 이어진 개념이 없습니다.</p>`);
+    document.querySelectorAll("#panel a[data-id]").forEach(a => a.onclick = () => show(a.dataset.id));
+    draw(id, rs);
+  }
+
+  function draw(id, rs) {
+    if (sim) sim.stop();
+    svg.selectAll("*").remove();
+    const W = svg.node().clientWidth, H = svg.node().clientHeight;
+    const ids = new Set([id]);
+    rs.slice(0, 40).forEach(r => { ids.add(r.s); ids.add(r.o); });
+    const nodes = [...ids].map(k => ({id: k, t: byId.get(k).t, me: k === id}));
+    const links = rs.slice(0, 40).map(r => ({source: r.s, target: r.o, r: r.r, tone: tone(r)}));
+    sim = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(links).id(d => d.id).distance(130))
+      .force("charge", d3.forceManyBody().strength(-420))
+      .force("center", d3.forceCenter(W / 2, H / 2))
+      .force("collide", d3.forceCollide(46));
+    const col = t => t === "pos" ? getComputedStyle(document.body).getPropertyValue("--pos") : t === "neg" ? getComputedStyle(document.body).getPropertyValue("--neg") : getComputedStyle(document.body).getPropertyValue("--line");
+    const L = svg.append("g").selectAll("line").data(links).join("line").attr("stroke", d => col(d.tone)).attr("stroke-width", 2);
+    const LT = svg.append("g").selectAll("text").data(links).join("text").text(d => d.r).style("font-size", "10px").style("opacity", .7);
+    const G = svg.append("g").selectAll("g").data(nodes).join("g").style("cursor", "pointer").on("click", (e, d) => show(d.id))
+      .call(d3.drag().on("start", (e, d) => { if (!e.active) sim.alphaTarget(.3).restart(); d.fx = d.x; d.fy = d.y; })
+        .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
+    G.append("circle").attr("r", d => d.me ? 12 : 7).attr("fill", d => d.me ? getComputedStyle(document.body).getPropertyValue("--acc") : "#9aa3b2");
+    G.append("text").text(d => d.t.length > 14 ? d.t.slice(0, 14) + "…" : d.t).attr("x", 12).attr("y", 4).style("font-weight", d => d.me ? 700 : 400);
+    sim.on("tick", () => {
+      L.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+      LT.attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2);
+      G.attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+  }
+
+  const q = document.getElementById("q"), hits = document.getElementById("hits");
+  q.oninput = () => {
+    const s = q.value.trim();
+    if (!s) { hits.innerHTML = ""; return; }
+    const m = data.nodes.filter(n => n.t.includes(s) || n.d.includes(s)).sort((a, b) => (b.t.includes(s) - a.t.includes(s)) || deg(b.id) - deg(a.id)).slice(0, 12);
+    hits.innerHTML = m.map(n => `<li data-id="${esc(n.id)}">${esc(n.t)} <span class="mute">· 관계 ${deg(n.id)}</span></li>`).join("");
+    hits.querySelectorAll("li").forEach(li => li.onclick = () => { show(li.dataset.id); hits.innerHTML = ""; q.value = ""; });
+  };
+
+  const start = new URLSearchParams(location.search).get("c");
+  show(byId.has(start) ? start : "dreamer:fresh-start-effect");
+})();
+</script>
+</body>
+</html>
