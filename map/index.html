@@ -31,7 +31,7 @@ text{font-size:12px;fill:var(--fg);pointer-events:none}
 <a href="/">몽상가 명빈 연구 노트</a> · <a href="/about/">소개</a>
 <h1 style="font-size:1.4em;margin:.5em 0 .2em">지식 지도</h1>
 <p class="mute" style="margin:0 0 .5em">심리·인지·재미에 관한 개념과 그 사이의 관계입니다. 개념을 검색하거나 눌러 보세요. 초록 테두리는 늘린다, 붉은 테두리는 줄인다이고, 연구로 확인한 관계에는 논문이 붙어 있습니다.</p>
-<input id="q" placeholder="개념 검색 (예: 내재적 동기, 새 출발 효과, 인지 부하)" autocomplete="off">
+<input id="q" placeholder="개념 검색 (예: 내재적 동기, 새 출발 효과, satiation)" autocomplete="off">
 <ul id="hits"></ul>
 </header>
 <div class="wrap">
@@ -71,7 +71,7 @@ text{font-size:12px;fill:var(--fg);pointer-events:none}
     const rs = (out.get(id) || []).concat(inn.get(id) || []);
     rs.sort((a, b) => (b.ev ? 1 : 0) - (a.ev ? 1 : 0));
     document.getElementById("panel").innerHTML =
-      `<h2>${esc(n.t)}</h2><p>${esc(n.d)}</p><p class="mute">관계 ${rs.length}개</p>` +
+      `<h2>${esc(n.t)}</h2>` + (n.enp ? `<p class="mute" lang="en">${esc(n.en)}</p>` : '') + `<p>${esc(n.d)}</p><p class="mute">관계 ${rs.length}개</p>` +
       (rs.length ? rs.map(r => relLine(r, id)).join("") : `<p class="mute">아직 이어진 개념이 없습니다.</p>`);
     document.querySelectorAll("#panel a[data-id]").forEach(a => a.onclick = () => show(a.dataset.id));
     draw(id, rs);
@@ -109,7 +109,7 @@ text{font-size:12px;fill:var(--fg);pointer-events:none}
   q.oninput = () => {
     const s = q.value.trim();
     if (!s) { hits.innerHTML = ""; return; }
-    const m = data.nodes.filter(n => n.t.includes(s) || n.d.includes(s)).sort((a, b) => (b.t.includes(s) - a.t.includes(s)) || deg(b.id) - deg(a.id)).slice(0, 12);
+    const sl = s.toLowerCase(); const m = data.nodes.filter(n => n.t.includes(s) || n.d.includes(s) || (n.en || '').toLowerCase().includes(sl)).sort((a, b) => (b.t.includes(s) - a.t.includes(s)) || deg(b.id) - deg(a.id)).slice(0, 12);
     hits.innerHTML = m.map(n => `<li data-id="${esc(n.id)}">${esc(n.t)} <span class="mute">· 관계 ${deg(n.id)}</span></li>`).join("");
     hits.querySelectorAll("li").forEach(li => li.onclick = () => { show(li.dataset.id); hits.innerHTML = ""; q.value = ""; });
   };
